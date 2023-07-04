@@ -18,27 +18,30 @@ use Symfony\Component\Validator\Constraints as Assert;
 
 /**
  * @author Titouan Galopin <galopintitouan@gmail.com>
- *
+ * @updatedBy Virgile Baisnee <me@virgilebaisnee.fr> to handle the rotation
+ * 
+ * 
  * @final
  */
 class Crop
 {
+    
+
     private $imageManager;
     private $filename;
-
+  
     /**
      * @var int|null
      */
     private $maxWidth;
-
+  
     /**
      * @var int|null
      */
     private $maxHeight;
-
+  
     /**
      * @Assert\NotBlank()
-     *
      * @Assert\Type("array")
      */
     private $options = [
@@ -46,77 +49,84 @@ class Crop
         'y' => 0,
         'width' => null,
         'height' => null,
+        'rotate' => null
     ];
-
+  
     public function __construct(ImageManager $imageManager, string $filename)
     {
         $this->imageManager = $imageManager;
         $this->filename = $filename;
     }
-
+  
     public function getCroppedThumbnail(int $maxWidth, int $maxHeight, string $format = 'jpg', int $quality = 80): string
     {
         $image = $this->createCroppedImage();
-
+  
         $image->resize($maxWidth, $maxHeight, static function ($constraint) {
             $constraint->aspectRatio();
             $constraint->upsize();
         });
-
+  
         $image->encode($format, $quality);
-
+  
         return $image->getEncoded();
     }
-
+  
     public function getCroppedImage(string $format = 'jpg', int $quality = 80): string
     {
         $image = $this->createCroppedImage();
-
+  
         // Max size
         if ($this->maxWidth && $this->maxHeight) {
             $image->resize($this->maxWidth, $this->maxHeight, static function (Constraint $constraint) {
                 $constraint->aspectRatio();
                 $constraint->upsize();
             });
+  
         }
-
+  
         $image->encode($format, $quality);
-
+  
         return $image->getEncoded();
     }
-
+  
     private function createCroppedImage(): Image
     {
         $image = $this->imageManager->make(file_get_contents($this->filename));
-
+        // Rotate
+        if($this->options['rotate']){
+            $image->rotate((-1) * $this->options['rotate']);
+        }
+       
         // Crop
         if ($this->options['width'] && $this->options['height']) {
             $image->crop(
                 (int) round($this->options['width']),
                 (int) round($this->options['height']),
                 (int) round($this->options['x']),
-                (int) round($this->options['y'])
+                (int) round($this->options['y']),
             );
         }
-
+  
+  
         return $image;
     }
-
+  
     public function getOptions(): string
     {
         return json_encode($this->options);
     }
-
+  
     /**
      * @return $this
      */
     public function setOptions(string $options): self
     {
         $this->options = json_decode($options, true);
-
+  
         return $this;
     }
-
+  
     /**
      * @return $this
      */
@@ -127,10 +137,10 @@ class Crop
                 $this->options[$key] = $options[$key];
             }
         }
-
+  
         return $this;
     }
-
+  
     /**
      * @return $this
      */
@@ -138,7 +148,14 @@ class Crop
     {
         $this->maxWidth = $maxWidth;
         $this->maxHeight = $maxHeight;
-
+  
         return $this;
     }
-}
+  
+    public function setFilename(string $filename): self
+    {
+        $this->filename = $filename;
+  
+        return $this;
+    }
+  }
